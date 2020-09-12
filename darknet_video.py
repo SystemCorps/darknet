@@ -7,6 +7,7 @@ import darknet
 import argparse
 from threading import Thread, enumerate
 from queue import Queue
+import subprocess
 
 
 def parser():
@@ -108,6 +109,32 @@ def drawing(frame_queue, detections_queue, fps_queue):
     cv2.destroyAllWindows()
 
 
+def open_cam_onboard(width, height):
+    gst_elements = str(subprocess.check_output('gst-inspect-1.0'))
+    if 'nvcamerasrc' in gst_elements:
+        # On versions of L4T prior to 28.1, add 'flip-method=2' into gst_str
+        gst_str = ('nvcamerasrc ! '
+                   'video/x-raw(memory:NVMM), '
+                   'width=(int)2592, height=(int)1458, '
+                   'format=(string)I420, framerate=(fraction)30/1 ! '
+                   'nvvidconv ! '
+                   'video/x-raw, width=(int){}, height=(int){}, '
+                   'format=(string)BGRx ! '
+                   'videoconvert ! appsink').format(width, height)
+    elif 'nvarguscamerasrc' in gst_elements:
+        gst_str = ('nvarguscamerasrc ! '
+                   'video/x-raw(memory:NVMM), '
+                   'width=(int)1920, height=(int)1080, '
+                   'format=(string)NV12, framerate=(fraction)30/1 ! '
+                   'nvvidconv flip-method=2 ! '
+                   'video/x-raw, width=(int){}, height=(int){}, '
+                   'format=(string)BGRx ! '
+                   'videoconvert ! appsink').format(width, height)
+    else:
+        raise RuntimeError('onboard camera source not found!')
+    return cv2.VideoCapture(gst_str, cv2.CAP_GSTREAMER)
+
+
 if __name__ == '__main__':
     frame_queue = Queue()
     darknet_image_queue = Queue(maxsize=1)
@@ -128,8 +155,10 @@ if __name__ == '__main__':
     height = darknet.network_height(network)
     darknet_image = darknet.make_image(width, height, 3)
     input_path = str2int(args.input)
-    cap = cv2.VideoCapture("nvcamerasrc ! video/x-raw(memory:NVMM), width=(int)1280, height=(int)720,format=(string)I420, framerate=(fraction)30/1 ! nvvidconv flip-method=0 ! video/x-raw, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink")
-    #cap = cv2.VideoCapture(input_path)
+    width = 1920
+    height = 1080
+    #cap = open_cam_onboard(width, height)
+    cap = cv2.VideoCapture(input_path)
     Thread(target=video_capture, args=(frame_queue, darknet_image_queue)).start()
     Thread(target=inference, args=(darknet_image_queue, detections_queue, fps_queue)).start()
     Thread(target=drawing, args=(frame_queue, detections_queue, fps_queue)).start()
