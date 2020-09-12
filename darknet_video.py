@@ -15,13 +15,13 @@ def parser():
                         help="video source. If empty, uses webcam 0 stream")
     parser.add_argument("--out_filename", type=str, default="",
                         help="inference video name. Not saved if empty")
-    parser.add_argument("--weights", default="yolov4.weights",
+    parser.add_argument("--weights", default="yolov3.weights",
                         help="yolo weights path")
     parser.add_argument("--dont_show", action='store_true',
                         help="windown inference display. For headless systems")
     parser.add_argument("--ext_output", action='store_true',
                         help="display bbox coordinates of detected objects")
-    parser.add_argument("--config_file", default="./cfg/yolov4.cfg",
+    parser.add_argument("--config_file", default="./cfg/yolov3.cfg",
                         help="path to config file")
     parser.add_argument("--data_file", default="./cfg/coco.data",
                         help="path to data file")
@@ -128,7 +128,8 @@ if __name__ == '__main__':
     height = darknet.network_height(network)
     darknet_image = darknet.make_image(width, height, 3)
     input_path = str2int(args.input)
-    cap = cv2.VideoCapture(input_path)
+    cap = cv2.VideoCapture("nvcamerasrc ! video/x-raw(memory:NVMM), width=(int)1280, height=(int)720,format=(string)I420, framerate=(fraction)30/1 ! nvvidconv flip-method=0 ! video/x-raw, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink")
+    #cap = cv2.VideoCapture(input_path)
     Thread(target=video_capture, args=(frame_queue, darknet_image_queue)).start()
     Thread(target=inference, args=(darknet_image_queue, detections_queue, fps_queue)).start()
     Thread(target=drawing, args=(frame_queue, detections_queue, fps_queue)).start()
